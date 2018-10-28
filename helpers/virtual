@@ -2,13 +2,14 @@
 #
 # Helper functions to manage virtual displays
 
-_clean() {
+# Clean everything
+_rm_virt_display() {
   
   # TODO: close x11vnc
-  kill -9 $(pgrep x11vnc -a | grep "${virtual_port}" | awk '{ print $1 }')
+  kill $(pgrep x11vnc -a | grep "${virtual_port}" | awk '{ print $1 }') 2> /dev/null
 
   # Close SSH tunnel
-  kill -9 $(pgrep ssh -a | grep "${client_ip}" | awk '{ print $1 }')
+  kill $(pgrep ssh -a | grep "${client_ip}" | awk '{ print $1 }') 2> /dev/null
 
   ## Turn Virtual Display off
   xrandr --output ${virtual_display} --off
@@ -45,26 +46,27 @@ virtual_new_display() {
   # Create Virtual Display
   xrandr --newmode $mode
   {  xrandr --addmode ${virtual_display} $mode_name && \
-    # TODO: implement smart positioning (customizable)
-    xrandr --output ${virtual_display} --mode ${mode_name} --scale ${virtual_scale}x${virtual_scale}; \
-  } || { _clean; _error "Couldn't create virtual display"; }
+     xrandr --output ${virtual_display} --mode ${mode_name} --scale ${virtual_scale}x${virtual_scale}; \
+  } || { _rm_virt_display; _error "Couldn't create virtual display"; }
   
   ## Create secure SSH tunnel with the client
-  ssh -f -C -NT -R "5900:127.0.0.1:${virtual_port}" -o "ExitOnForwardFailure yes" "${client_ip}" -p 8022 || { _clean; _error "Couldn't create ssh tunnel (did you start sshd on the client?)"; }
+  ssh -f -C -NT -R "5900:127.0.0.1:${virtual_port}" -o "ExitOnForwardFailure yes" "${client_ip}" -p 8022 || { _rm_virt_display; _error "Couldn't create ssh tunnel (did you start sshd on the client?)"; }
   
   ## Start vnc
   local vnc_logfile="$PWD/logs/${virtual_display}.log"
-  x11vnc --auth guess -localhost -once -rfbport ${virtual_port} \
+  x11vnc --auth guess -localhost -forever -rfbport ${virtual_port} \
     -repeat -bg \
     -xrandr -nosel -fixscreen \"V=2\" -noprimary -nosetclipboard -noclipboard -cursor most -nowf -nonap -noxdamage -sb 0 -clip xinerama1 \
     -o "$vnc_logfile" \
     -display :0 \
      > /dev/null \
-     || { _clean; _error "Couldn't start vnc service"; }
-  
+     || { _rm_virt_display; _error "Couldn't start vnc service"; }
+
+  # Start vnc client
+  $ADB shell am start -a "android.intent.action.VIEW" -d "vnc://localhost:5900" &> /dev/null || echo 'Configure your VNC Client to connect to "vnc://localhost:5900"'
+
   _return "${virtual_display_id}"
 }
-
 
 virtual_remove_display() {
   
@@ -72,8 +74,9 @@ virtual_remove_display() {
   local mode_name=$2
   local virtual_port=$3
   local client_ip=$4
-  
-  _clean
+ 
+  echo "Cleaning up..."
+  _rm_virt_display
 }
 
 virtual_move_display() {

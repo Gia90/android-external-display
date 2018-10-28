@@ -7,7 +7,10 @@ source helpers/server
 source helpers/client
 source helpers/virtual
 
+trap : INT
+
 _error() {
+  echo
   echo "[ERROR] $1"
   exit 1
 }
@@ -26,13 +29,15 @@ echo
 ADB=${ADB:-$(command -v adb 2>&1)}
 [ -n "${ADB}" ] || _error "adb binary not found in PATH and no ADB env variable defined" 
 
+## ADB device found?
+[ -n "$($ADB devices | tail -n+2)" ] || _error "adb couldn't find any conencted device"
+
 ## ADB authorized?
 adb devices | grep -q "unauthorized" && _error "adb is not authorized to access the device"
 
 #******* HANDLE PRAMETERS ******#
 # TODO: command parameters
 #echo $@
-
 
 #******** SERVER DETAILS *******#
 
@@ -46,19 +51,16 @@ CLIENT_RESOLUTION=($(client_get_resolution))
 CLIENT_DPI=$(client_get_dpi)
 CLIENT_IP=$(client_get_ip)
 
-
 #******** VIRTUAL ********#
 
 VIRTUAL_SCALE=$(bc <<< "scale=2; ${SERVER_DPI} / ${CLIENT_DPI}" | awk '{printf "%f", $0}') # Add traling zero to bc output
 VIRTUAL_RESOLUTION=(${CLIENT_RESOLUTION[*]})
 
-echo "[>] Configuring external display"
-
+echo "[>] Starting new external display..."
 ## Create new external virtual display and store its ID (details)
 virtual_new_display ${VIRTUAL_RESOLUTION[0]} ${VIRTUAL_RESOLUTION[1]} ${VIRTUAL_SCALE} ${CLIENT_IP} || _error "Couldn't create new virtual display"
-
 VIRTUAL_DISPLAY_ID=$_res
-echo "[>] Added new external display: $VIRTUAL_DISPLAY_ID"
+echo "${VIRTUAL_DISPLAY_ID}"
 
 echo
 # TODO: here show interactive menu to refresh external device, reposition them, go to backgroud, exit
@@ -67,8 +69,8 @@ options=("Reposition display" "Exit")
 select opt in "${options[@]}"
 do
     case $opt in
-        "Reposition")
-            echo "Reposition virtual display"
+        "Reposition display")
+            echo "Move the virtual display as wished and *be sure to save and close* Arandr."
             virtual_move_display ${VIRTUAL_DISPLAY_ID}
             ;;
         "Exit")
@@ -80,7 +82,3 @@ done
 
 ## Delete external virtual display
 virtual_remove_display ${VIRTUAL_DISPLAY_ID}
-
-echo "BYE!"
-
-trap "virtual_remove_display ${VIRTUAL_DISPLAY_ID}" INT
