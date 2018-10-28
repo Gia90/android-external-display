@@ -13,16 +13,21 @@ _error() {
 }
 
 _return() {
-  echo $@
+  _res="$@"
 }
 
+echo "#******************************#"
+echo "#   ANdroid EXternal Display   #"
+echo "*******************************"
+echo 
 
 #******* CHECK REQUIREMENT ******#
-## ADB
+## ADB?
 ADB=${ADB:-$(command -v adb 2>&1)}
-[ -n "${ADB}" ] || error "adb binary not found in PATH and no ADB env variable defined" 
+[ -n "${ADB}" ] || _error "adb binary not found in PATH and no ADB env variable defined" 
 
-# TODO: check if adb authorized
+## ADB authorized?
+adb devices | grep -q "unauthorized" && _error "adb is not authorized to access the device"
 
 #******* HANDLE PRAMETERS ******#
 # TODO: command parameters
@@ -47,39 +52,26 @@ CLIENT_IP=$(client_get_ip)
 VIRTUAL_SCALE=$(bc <<< "scale=2; ${SERVER_DPI} / ${CLIENT_DPI}" | awk '{printf "%f", $0}') # Add traling zero to bc output
 VIRTUAL_RESOLUTION=(${CLIENT_RESOLUTION[*]})
 
-## Check param position, this position is where the user want the new screen
-if [ -z "$position" ] ; then
-	position="right"
-fi
-if [ "$position" = "left" ] ; then
-	xinerama="xinerama0"
-else
-	xinerama="xinerama1"
-fi
+echo "[>] Configuring external display"
 
-echo "Create display"
+## Create new external virtual display and store its ID (details)
+virtual_new_display ${VIRTUAL_RESOLUTION[0]} ${VIRTUAL_RESOLUTION[1]} ${VIRTUAL_SCALE} ${CLIENT_IP} || _error "Couldn't create new virtual display"
 
-## Create new external virtual display and store its details
-VIRTUAL_DISPLAY_ID=$(virtual_new_display ${VIRTUAL_RESOLUTION[0]} ${VIRTUAL_RESOLUTION[1]} ${VIRTUAL_SCALE} ${CLIENT_IP} | tail -1)
+VIRTUAL_DISPLAY_ID=$_res
+echo "[>] Added new external display: $VIRTUAL_DISPLAY_ID"
 
-echo "VIRTUAL_DISPLAY_ID= $VIRTUAL_DISPLAY_ID"
-
+echo
 # TODO: here show interactive menu to refresh external device, reposition them, go to backgroud, exit
-PS3='Please enter your choice: '
-options=("Option 1" "Option 2" "Option 3" "Quit")
+PS3='Choose an option: '
+options=("Reposition display" "Exit")
 select opt in "${options[@]}"
 do
     case $opt in
-        "Option 1")
-            echo "you chose choice 1"
+        "Reposition")
+            echo "Reposition virtual display"
+            virtual_move_display ${VIRTUAL_DISPLAY_ID}
             ;;
-        "Option 2")
-            echo "you chose choice 2"
-            ;;
-        "Option 3")
-            echo "you chose choice $REPLY which is $opt"
-            ;;
-        "Quit")
+        "Exit")
             break
             ;;
         *) echo "invalid option $REPLY";;
@@ -90,3 +82,5 @@ done
 virtual_remove_display ${VIRTUAL_DISPLAY_ID}
 
 echo "BYE!"
+
+trap "virtual_remove_display ${VIRTUAL_DISPLAY_ID}" INT

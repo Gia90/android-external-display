@@ -2,68 +2,84 @@
 #
 # Helper functions to manage virtual displays
 
+_clean() {
+  
+  # TODO: close x11vnc
+  kill -9 $(pgrep x11vnc -a | grep "${virtual_port}" | awk '{ print $1 }')
+
+  # Close SSH tunnel
+  kill -9 $(pgrep ssh -a | grep "${client_ip}" | awk '{ print $1 }')
+
+  ## Turn Virtual Display off
+  xrandr --output ${virtual_display} --off
+  xrandr --delmode ${virtual_display} ${mode_name}
+  xrandr --rmmode ${mode_name}
+}
 
 # Create a new virtual display.
 # Arguments:
-#  - resolution
+#  - width
+#  - height
 #  - scale
 #  - client ip (to be used as external monitor)
 virtual_new_display() {
   
-  virtual_width=$1
-  virtual_height=$2
-  virtual_scale=$3
-  client_ip=$4
+  local virtual_width=$1
+  local virtual_height=$2
+  local virtual_scale=$3
+  local client_ip=$4
  
-  echo "IOAL"
-  echo $virtual_width
-  echo $virtual_height
-  echo $virtual_scale
-  echo $client_ip
-  
-
   # Find first available VIRTUAL display
   local virtual_display=$(xrandr | grep "VIRTUAL.*disconnected" | head -1 | awk '{print $1}')
+  
+  # TODO: pick random/free port in a range 
+  local virtual_port=5999
   
   # Build the mode for the virtual display
   local mode=$(cvt ${virtual_width} ${virtual_height} 60 | grep "Modeline" | cut -d' ' -f 2-17)
   local mode_name=$(echo "$mode" | awk '{print $1}')
 
+  # ID of the new virtual display
+  local virtual_display_id="${virtual_display} ${mode_name} ${virtual_port} ${client_ip}"
+
   # Create Virtual Display
   xrandr --newmode $mode
-  xrandr --addmode ${virtual_display} $mode_name
-  # TODO: implement smart positioning (customizable)
-  xrandr --output ${virtual_display} --mode ${mode_name} --right-of ${SERVER_DISPLAY} --scale ${virtual_scale}x${virtual_scale}
+  {  xrandr --addmode ${virtual_display} $mode_name && \
+    # TODO: implement smart positioning (customizable)
+    xrandr --output ${virtual_display} --mode ${mode_name} --scale ${virtual_scale}x${virtual_scale}; \
+  } || { _clean; _error "Couldn't create virtual display"; }
   
-  # TODO: pick random/free port in a range 
-  local virtual_port=5999
-
   ## Create secure SSH tunnel with the client
-  ssh -f -C -NT -R "5900:127.0.0.1:${virtual_port}" -o "ExitOnForwardFailure yes" "${client_ip}" -p 8022
-
-  ## Start VNC
+  ssh -f -C -NT -R "5900:127.0.0.1:${virtual_port}" -o "ExitOnForwardFailure yes" "${client_ip}" -p 8022 || { _clean; _error "Couldn't create ssh tunnel (did you start sshd on the client?)"; }
+  
+  ## Start vnc
+  local vnc_logfile="$PWD/logs/${virtual_display}.log"
   x11vnc --auth guess -localhost -once -rfbport ${virtual_port} \
     -repeat -bg \
-    -xrandr -nosel -fixscreen \"V=2\" -noprimary -nosetclipboard -noclipboard -cursor most -nowf -nonap -noxdamage -sb 0 \
-    -clip ${xinerama} \
+    -xrandr -nosel -fixscreen \"V=2\" -noprimary -nosetclipboard -noclipboard -cursor most -nowf -nonap -noxdamage -sb 0 -clip xinerama1 \
+    -o "$vnc_logfile" \
     -display :0 \
+     > /dev/null \
+     || { _clean; _error "Couldn't start vnc service"; }
   
-  _return "${virtual_display}" "${mode_name}" "${client_ip}"
+  _return "${virtual_display_id}"
 }
+
 
 virtual_remove_display() {
   
-  virtual_display=$1
-  mode_name=$2
-  client_ip=$3
+  local virtual_display=$1
+  local mode_name=$2
+  local virtual_port=$3
+  local client_ip=$4
   
-  # Close SSH tunnel
-  kill -9 $(pgrep ssh -a | grep "${client_ip}" | awk '{ print $1 }')
+  _clean
+}
 
-  # x11vnc should close automatically (-once flag)
-  
-  ## Turn Virtual Display off
-  xrandr --output ${virtual_display} --off
-  xrandr --delmode ${virtual_display} $mode_name
-  xrandr --rmmode $mode_name
+virtual_move_display() {
+  local virtual_display=$1
+
+  arandr
+  local new_position=$(xrandr | grep $virtual_display | awk '{print $3;}')
+  x11vnc -R "clip:${new_position}"
 }
