@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# DEBUG
+#set -x
+
+source helpers/server
+source helpers/client
+source helpers/virtual
+
+_error() {
+  echo "[ERROR] $1"
+  exit 1
+}
+
+_return() {
+  echo $@
+}
+
+
+#******* CHECK REQUIREMENT ******#
+## ADB
+ADB=${ADB:-$(command -v adb 2>&1)}
+[ -n "${ADB}" ] || error "adb binary not found in PATH and no ADB env variable defined" 
+
+# TODO: check if adb authorized
+
+#******* HANDLE PRAMETERS ******#
+# TODO: command parameters
+#echo $@
+
+
+#******** SERVER DETAILS *******#
+
+SERVER_DISPLAY=$(server_get_display)
+SERVER_DPI=$(server_get_dpi)
+SERVER_IP=$(server_get_ip)
+
+#******** CLIENT DETAILS *******#
+
+CLIENT_RESOLUTION=($(client_get_resolution))
+CLIENT_DPI=$(client_get_dpi)
+CLIENT_IP=$(client_get_ip)
+
+
+#******** VIRTUAL ********#
+
+VIRTUAL_SCALE=$(bc <<< "scale=2; ${SERVER_DPI} / ${CLIENT_DPI}" | awk '{printf "%f", $0}') # Add traling zero to bc output
+VIRTUAL_RESOLUTION=(${CLIENT_RESOLUTION[*]})
+
+## Check param position, this position is where the user want the new screen
+if [ -z "$position" ] ; then
+	position="right"
+fi
+if [ "$position" = "left" ] ; then
+	xinerama="xinerama0"
+else
+	xinerama="xinerama1"
+fi
+
+echo "Create display"
+
+## Create new external virtual display and store its details
+VIRTUAL_DISPLAY_ID=$(virtual_new_display ${VIRTUAL_RESOLUTION[0]} ${VIRTUAL_RESOLUTION[1]} ${VIRTUAL_SCALE} ${CLIENT_IP} | tail -1)
+
+echo "VIRTUAL_DISPLAY_ID= $VIRTUAL_DISPLAY_ID"
+
+# TODO: here show interactive menu to refresh external device, reposition them, go to backgroud, exit
+PS3='Please enter your choice: '
+options=("Option 1" "Option 2" "Option 3" "Quit")
+select opt in "${options[@]}"
+do
+    case $opt in
+        "Option 1")
+            echo "you chose choice 1"
+            ;;
+        "Option 2")
+            echo "you chose choice 2"
+            ;;
+        "Option 3")
+            echo "you chose choice $REPLY which is $opt"
+            ;;
+        "Quit")
+            break
+            ;;
+        *) echo "invalid option $REPLY";;
+    esac
+done
+
+## Delete external virtual display
+virtual_remove_display ${VIRTUAL_DISPLAY_ID}
+
+echo "BYE!"

@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# Helper functions to manage virtual displays
+
+
+# Create a new virtual display.
+# Arguments:
+#  - resolution
+#  - scale
+#  - client ip (to be used as external monitor)
+virtual_new_display() {
+  
+  virtual_width=$1
+  virtual_height=$2
+  virtual_scale=$3
+  client_ip=$4
+ 
+  echo "IOAL"
+  echo $virtual_width
+  echo $virtual_height
+  echo $virtual_scale
+  echo $client_ip
+  
+
+  # Find first available VIRTUAL display
+  local virtual_display=$(xrandr | grep "VIRTUAL.*disconnected" | head -1 | awk '{print $1}')
+  
+  # Build the mode for the virtual display
+  local mode=$(cvt ${virtual_width} ${virtual_height} 60 | grep "Modeline" | cut -d' ' -f 2-17)
+  local mode_name=$(echo "$mode" | awk '{print $1}')
+
+  # Create Virtual Display
+  xrandr --newmode $mode
+  xrandr --addmode ${virtual_display} $mode_name
+  # TODO: implement smart positioning (customizable)
+  xrandr --output ${virtual_display} --mode ${mode_name} --right-of ${SERVER_DISPLAY} --scale ${virtual_scale}x${virtual_scale}
+  
+  # TODO: pick random/free port in a range 
+  local virtual_port=5999
+
+  ## Create secure SSH tunnel with the client
+  ssh -f -C -NT -R "5900:127.0.0.1:${virtual_port}" -o "ExitOnForwardFailure yes" "${client_ip}" -p 8022
+
+  ## Start VNC
+  x11vnc --auth guess -localhost -once -rfbport ${virtual_port} \
+    -repeat -bg \
+    -xrandr -nosel -fixscreen \"V=2\" -noprimary -nosetclipboard -noclipboard -cursor most -nowf -nonap -noxdamage -sb 0 \
+    -clip ${xinerama} \
+    -display :0 \
+  
+  _return "${virtual_display}" "${mode_name}" "${client_ip}"
+}
+
+virtual_remove_display() {
+  
+  virtual_display=$1
+  mode_name=$2
+  client_ip=$3
+  
+  # Close SSH tunnel
+  kill -9 $(pgrep ssh -a | grep "${client_ip}" | awk '{ print $1 }')
+
+  # x11vnc should close automatically (-once flag)
+  
+  ## Turn Virtual Display off
+  xrandr --output ${virtual_display} --off
+  xrandr --delmode ${virtual_display} $mode_name
+  xrandr --rmmode $mode_name
+}

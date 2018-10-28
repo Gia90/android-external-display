@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# Helper functions to get info about the android device (taht will be used as external display)
+
+# Return client display resolution as "{WIDTH} {HEIGHT}"
+client_get_resolution() {
+  $ADB shell dumpsys window displays | grep init | awk '{print $3}' | cut -d'=' -f2 | sed "s/x/ /"
+}
+
+# Return client display DPI
+client_get_dpi() {
+  $ADB shell dumpsys display | grep DisplayDeviceInfo  | sed -n -e 's/^.*density \([0-9]\+\).*/\1/p'
+}
+
+# Return client ip
+client_get_ip() {
+  $ADB shell ip route | grep src | sed 's/^.*src \([^ ]*\).*$/\1/'
+}
+
