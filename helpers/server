@@ -15,7 +15,7 @@ server_get_dpi() {
   }
 
   ## Find display resolution
-  local h_res=$(xrandr | grep \* | awk '{print $1}')
+  local h_res=$(xrandr | grep primary | awk '{ split($4, tokens, "+"); print tokens[1] }')
   local h_width=$(echo $h_res | cut -d'x' -f 1)
   local h_height=$(echo $h_res | cut -d'x' -f 2)
   local h_diag=$(diagonal $h_width $h_height)
