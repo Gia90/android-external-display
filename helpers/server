@@ -11,7 +11,8 @@ server_get_display() {
 server_get_dpi() {
   # Calculate diagonal
   diagonal() {
-    LC_ALL="C" printf '%.0f' $(bc <<< "scale=2; sqrt(540^2+960^2)")
+    bc <<< "scale=2; sqrt($h_width^2+$h_height^2)" |  python -c "print(round(float(input())))"
+
   }
 
   ## Find display resolution
