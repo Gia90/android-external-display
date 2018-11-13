@@ -29,7 +29,7 @@ server_get_dpi() {
   local h_psize=$(xrandr | grep eDP | awk '{print $(NF-2), $(NF)}' | sed "s/mm//g")
   local h_pwidth=$(echo "$h_psize" | cut -d' ' -f1)
   local h_pheight=$(echo "$h_psize" | cut -d' ' -f2)
-  local h_pdiag=$(bc <<< "scale=0; $(diagonal $h_pwidth $h_pheight)/25.4" | round)
+  local h_pdiag=$(bc <<< "scale=0; $(diagonal $h_pwidth $h_pheight | round)/25.4")
   local h_dpi=$(bc <<< "scale=2; $h_diag/$h_pdiag" | round)
   
   unset -f round diagonal
