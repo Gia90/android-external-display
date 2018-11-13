@@ -9,24 +9,30 @@ server_get_display() {
 
 # Calculate server's screen dpi (XORG with xdpyinfo reports wrong dpi, since it always defaults to 96 dpi)
 server_get_dpi() {
+  # Round to integer
+  round() {
+    read x
+    LC_ALL=C printf '%.0f' $x
+  }
+  
   # Calculate diagonal
   diagonal() {
-    printf '%.0f' $(bc <<< "scale=2; sqrt($1^2+$2^2)")
+    bc <<< "scale=2; sqrt($1^2+$2^2)"
   }
 
   ## Find display resolution
   local h_res=$(xrandr | grep primary | awk '{ split($4, tokens, "+"); print tokens[1] }')
-  local h_width=$(echo $h_res | cut -d'x' -f 1)
-  local h_height=$(echo $h_res | cut -d'x' -f 2)
-  local h_diag=$(diagonal $h_width $h_height)
+  local h_width=$(echo $h_res | cut -d'x' -f1)
+  local h_height=$(echo $h_res | cut -d'x' -f2)
+  local h_diag=$(diagonal $h_width $h_height | round)
 
   local h_psize=$(xrandr | grep eDP | awk '{print $(NF-2), $(NF)}' | sed "s/mm//g")
   local h_pwidth=$(echo "$h_psize" | cut -d' ' -f1)
   local h_pheight=$(echo "$h_psize" | cut -d' ' -f2)
-  local h_pdiag=$(bc <<< "scale=0; $(diagonal $h_pwidth $h_pheight)/25.4")
-  local h_dpi=$(bc <<< "scale=2; $h_diag/$h_pdiag" | xargs printf '%.0f')
+  local h_pdiag=$(bc <<< "scale=0; $(diagonal $h_pwidth $h_pheight)/25.4" | round)
+  local h_dpi=$(bc <<< "scale=2; $h_diag/$h_pdiag" | round)
   
-  unset -f diagonal
+  unset -f round diagonal
   echo $h_dpi
 } 
 
