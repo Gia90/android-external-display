@@ -14,11 +14,19 @@ Open source solution to use android devices as external display on linux.
 - [bVNC](https://play.google.com/store/apps/details?id=com.iiordanov.freebVNC) (or any other VNC Client that handles "vnc://" links)
 
 ## How to use NXD
-1. Start the SSH server on the android client. In termux, run: `sshd`.
-1. Be sure to be able to successfully connect to the it from the linux machine: `ssh {CLIENT_IP} -p 8022`. If not, setup a secure authentication method ([guide](https://wiki.termux.com/wiki/Remote_Access#OpenSSH)).
+1. Start the SSH server on the android client.  
+   In termux, run: `sshd`.
+1. Be sure to be able to successfully connect to the it from the linux machine:
+```
+ssh {CLIENT_IP} -p 8022
+```  
+   If not, setup a secure authentication method ([instructions](https://wiki.termux.com/wiki/Remote_Access#OpenSSH))
 1. Connect the android client to the linux machine through `adb` ([guide](https://wiki.lineageos.org/adb_fastboot_guide.html))
-  1. [Advanced]: you can even connect them through adb wirelessly: `adb connect {CLIENT_IP}`
-1. Be sure that the android device is unlocked and execute NXD: `./nxd`
+  1. [_Optional_] You can even connect them through adb wirelessly: `adb connect {CLIENT_IP}`
+1. Be sure that the android device is unlocked, then execute NXD:
+```
+./nxd
+```
 
 ## Issues
 - No virtual display is found: `xrandr: cannot find output "VIRTUAL1"`  
