@@ -11,7 +11,8 @@ server_get_display() {
 server_get_dpi() {
   # Calculate diagonal
   diagonal() {
-    printf '%.0f' $(bc <<< "scale=2; sqrt($1^2+$2^2)")
+    bc <<< "scale=2; sqrt($h_width^2+$h_height^2)" |  python -c "print(round(float(input())))"
+
   }
 
   ## Find display resolution
@@ -25,10 +26,10 @@ server_get_dpi() {
   local h_pheight=$(echo "$h_psize" | cut -d' ' -f2)
   local h_pdiag=$(bc <<< "scale=0; $(diagonal $h_pwidth $h_pheight)/25.4")
   local h_dpi=$(bc <<< "scale=2; $h_diag/$h_pdiag" | xargs printf '%.0f')
-  
+
   unset -f diagonal
   echo $h_dpi
-} 
+}
 
 # Return the server ip
 server_get_ip() {
