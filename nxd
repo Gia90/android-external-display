@@ -71,6 +71,7 @@ do
     case $opt in
         "Reposition display")
             echo "Move the virtual display as wished and *be sure to save and close* Arandr."
+            arandr
             virtual_move_display ${VIRTUAL_DISPLAY_ID}
             ;;
         "Exit")

@@ -17,6 +17,12 @@ _rm_virt_display() {
   xrandr --rmmode ${mode_name}
 }
 
+# Get screen region of the virtual display
+_get_virt_display_region() {
+  local virtual_display=$1
+  xrandr | grep $virtual_display | awk '{print $3;}'
+}
+
 # Create a new virtual display.
 # Arguments:
 #  - width
@@ -32,8 +38,8 @@ virtual_new_display() {
  
   # Find first available VIRTUAL display
   local virtual_display=$(xrandr | grep "VIRTUAL.*disconnected" | head -1 | awk '{print $1}')
-  
-  # TODO: pick random/free port in a range 
+
+  # TODO: pick random/free port in a range
   local virtual_port=5999
   
   # Build the mode for the virtual display
@@ -48,19 +54,25 @@ virtual_new_display() {
   {  xrandr --addmode ${virtual_display} $mode_name && \
      xrandr --output ${virtual_display} --mode ${mode_name} --scale ${virtual_scale}x${virtual_scale}; \
   } || { _rm_virt_display; _error "Couldn't create virtual display"; }
-  
+ 
+  # Only show the virtual screen subregion through VNC 
+  local virtual_clip=$(_get_virt_display_region $virtual_display)
+
   ## Create secure SSH tunnel with the client
   ssh -f -C -NT -R "5900:127.0.0.1:${virtual_port}" -o "ExitOnForwardFailure yes" "${client_ip}" -p 8022 || { _rm_virt_display; _error "Couldn't create ssh tunnel (did you start sshd on the client?)"; }
   
-  ## Start vnc
+  ## Start VNC
   local vnc_logfile="$PWD/logs/${virtual_display}.log"
   x11vnc --auth guess -localhost -forever -rfbport ${virtual_port} \
     -repeat -bg \
-    -xrandr -nosel -fixscreen \"V=2\" -noprimary -nosetclipboard -noclipboard -cursor most -nowf -nonap -noxdamage -sb 0 -clip xinerama1 \
+    -xrandr -nosel -fixscreen \"V=2\" -noprimary -nosetclipboard -noclipboard -cursor most -nowf -nonap -noxdamage -sb 0 -clip ${virtual_clip} \
     -o "$vnc_logfile" \
     -display :0 \
      > /dev/null \
      || { _rm_virt_display; _error "Couldn't start vnc service"; }
+
+  # Update subregion (it changes after starting the VNC)
+  virtual_move_display $virtual_display
 
   # Start vnc client
   $ADB shell am start -a "android.intent.action.VIEW" -d "vnc://localhost:5900" &> /dev/null || echo 'Configure your VNC Client to connect to "vnc://localhost:5900"'
@@ -81,8 +93,7 @@ virtual_remove_display() {
 
 virtual_move_display() {
   local virtual_display=$1
-
-  arandr
-  local new_position=$(xrandr | grep $virtual_display | awk '{print $3;}')
-  x11vnc -R "clip:${new_position}"
+  local clip_region=$(_get_virt_display_region $virtual_display)
+  x11vnc -R "clip:${clip_region}"
 }
+
